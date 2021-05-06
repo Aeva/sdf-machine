@@ -13,21 +13,20 @@
 (require "register_machine.rkt")
 
 
-(define sd
-  (sdfn (reg 3 input)
-        (reg 3 offset-1 10. 0. 0.)
-        (reg 3 offset-2 -50. 0. 0.)
-        (reg 3 point)
-        (reg 1 radius-1 200.)
-        (reg 1 radius-2 150.)
-        (reg 1 sphere-1)
-        (reg 1 sphere-2)
-        (reg 1 out)
-        (sub point input offset-1)
-        (sd-sphere sphere-1 point radius-1)
-        (sub point input offset-2)
-        (sd-sphere sphere-2 point radius-2)
-        (sd-cut out sphere-1 sphere-2)))
+(begin-encourage-inline
+  (define sd
+    (sdfn (reg 3 input)
+          (reg 3 offset-2 -50. 0. 50.)
+          (reg 3 point)
+          (reg 1 radius-1 200.)
+          (reg 1 radius-2 150.)
+          (reg 1 sphere-1)
+          (reg 1 sphere-2)
+          (reg 1 out)
+          (sd-sphere sphere-1 input radius-1)
+          (sub point input offset-2)
+          (sd-sphere sphere-2 point radius-2)
+          (sd-cut out sphere-1 sphere-2))))
 
 
 (define (safe-sd x y z)
@@ -41,11 +40,14 @@
 
 
 ; Render the distance field, line by line
-(define (scanline field x-extent y-extent)
-  (define width (+ 1 (* x-extent 2)))
-  (define height (+ 1 (* y-extent 2)))
-  (define bmp (make-bitmap width height))
+(define (scanline bmp field z color)
+  (define width (send bmp get-width))
+  (define height (send bmp get-height))
   (define ctx (new bitmap-dc% [bitmap bmp]))
+  (define x-extent (/ (- width 1) 2))
+  (define y-extent (/ (- height 1) 2))
+  (send ctx set-pen color 0 'solid)
+  (send ctx set-brush color 'solid)
 
   (define scan-start #f)
   (define scan-stop #f)
@@ -63,7 +65,7 @@
     (for ([x (in-range width)])
       (define sample-x (- x x-extent))
       (define sample-y (- y y-extent))
-      (define sample (field (->fl sample-x) (->fl sample-y) 0.))
+      (define sample (field (->fl sample-x) (->fl sample-y) z))
       (define solid (sample . <= . 0))
       (cond
         [(and solid scan-start)
@@ -77,19 +79,33 @@
     (when scan-start (draw y)))
   (define stop (current-inexact-milliseconds))
   (end-atomic)
-  (define delta (- stop start))
-  (display (~a delta " ms\n"))
-  bmp)
+  (- stop start))
 
 
 ; Render the distance field and post some stats.
-(define (run-demo)
-  (display "drawing...\n")
-  (let* ([bmp (scanline sd 210 200)]
+(define (run-demo slices)
+  (let* ([width 421]
+         [height 401]
+         [bmp (make-bitmap width height)]
+         [bmp-ctx (new bitmap-dc% [bitmap bmp])]
          [frame (new frame%
                      [label "sdf"]
-                     [width 480]
-                     [height 480])])
+                     [width (+ width 16)]
+                     [height (+ height 39)])])
+    (send bmp-ctx set-background (make-color 0 0 0))
+    (send bmp-ctx clear)
+    (display "rendering...\n")
+    (define start (current-inexact-milliseconds))
+    (for ([slice slices])
+      (let* ([alpha (/ slice (- slices 1))]
+             [inv-a (- 1.0 alpha)]
+             [c (round (* alpha 255))]
+             [color (make-color c c c)]
+             [z (+ (* inv-a -200.0) (* alpha 200.0))])
+        (scanline bmp sd (->fl z) color)))
+    (define end (current-inexact-milliseconds))
+    (define delta (- end start))
+    (display (~a slices " slices rendered in " (/ delta 1000) " seconds."))
     (new canvas%
          [parent frame]
          [paint-callback
@@ -97,4 +113,4 @@
             (send ctx draw-bitmap bmp 0 0))])
     (send frame show #t)))
 
-(run-demo)
+(run-demo 1000)
