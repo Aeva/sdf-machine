@@ -219,18 +219,3 @@
           (flvector-set! registers 2 z)
           #,(datum->syntax stx proc)
           (flvector-ref registers #,(- cursor 1))))))
-
-
-; Define a signed distance function!
-(define mysdf
-  (sdfn (reg 3 input)
-        (reg 3 offset 1. 0. 0.)
-        (reg 3 point)
-        (reg 1 out)
-        (add point input offset)
-        (dot out point point)
-        (sqrt out out)))
-
-
-; See if it worked!
-(display (mysdf 0. 1. 0.))
