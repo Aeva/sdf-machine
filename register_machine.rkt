@@ -148,11 +148,32 @@
                                  #,(append
                                     (list #'fl+)
                                     (for/list ([i (reg-size vec)])
-                                      #`(fl* #,(reg-ref vec i) #,(reg-ref vec i))))))))])
+                                      #`(fl* #,(reg-ref vec i) #,(reg-ref vec i))))))))]
+
+           ; SD Sphere command handler.
+           [handle-sd-sphere
+            (lambda (cmd out vec rad)
+              (check-reg cmd out)
+              (check-reg cmd vec)
+              (check-reg cmd rad)
+              (unless (eq? (reg-size out) 1)
+                (error "sd sphere expects a scalar output" cmd))
+              (unless (eq? (reg-size vec) 3)
+                (error "sd sphere expects a vec3 input" cmd))
+              (unless (eq? (reg-size rad) 1)
+                (error "sd sphere expects a scalar radius" cmd))
+              (commit
+               (reg-set out 0 #`(fl-
+                                 (flsqrt
+                                  #,(append
+                                     (list #'fl+)
+                                     (for/list ([i (reg-size vec)])
+                                       #`(fl* #,(reg-ref vec i) #,(reg-ref vec i)))))
+                                 #,(reg-ref rad 0)))))])
 
       ; Process accumulated commands to build out 'proc.
       (for ([cmd cmd-seq])
-        (syntax-case cmd (add sub mul div min max sqrt dot len)
+        (syntax-case cmd (add sub mul div min max sqrt dot len sd-sphere)
           ; Addition
           [(add out lhs rhs)
            (let* ([out (syntax->datum #'out)]
@@ -204,7 +225,13 @@
           [(len out vec)
            (let* ([out (syntax->datum #'out)]
                   [vec (syntax->datum #'vec)])
-             (handle-len cmd out vec))])))
+             (handle-len cmd out vec))]
+          ; Sphere
+          [(sd-sphere out vec rad)
+           (let* ([out (syntax->datum #'out)]
+                  [vec (syntax->datum #'vec)]
+                  [rad (syntax->datum #'rad)])
+             (handle-sd-sphere cmd out vec rad))])))
         
     ; This produces the initial values for the register file.
     (define initial-values (apply append (for/list ([name register-names]) (caddr (hash-ref register-info name)))))

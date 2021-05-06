@@ -19,13 +19,8 @@
         (reg 3 point)
         (reg 1 radius 200.)
         (reg 1 out)
-
-        ; translate
-        (sub point input offset)
-
-        ; sphere
-        (len out point)
-        (sub out out radius)))
+        (sub point input offset) ; translate
+        (sd-sphere out point radius)))
 
   
 (define (safe-sd x y z)
