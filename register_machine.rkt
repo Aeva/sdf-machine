@@ -109,6 +109,33 @@
                                         #,(reg-ref lhs lane)
                                         #,(reg-ref rhs lane)))))))]
 
+           ; Square root command handler.
+           [handle-sqrt
+            (lambda (cmd out vec)
+              (check-reg cmd out)
+              (check-reg cmd vec)
+              (let ([lanes (min (reg-size out)
+                                (reg-size vec))])
+                (for ([lane lanes])
+                  (commit
+                   (reg-set out lane #`(flsqrt #,(reg-ref vec lane)))))))]
+
+           ; Dot product command handler.
+           [handle-dot
+            (lambda (cmd out lhs rhs)
+              (check-reg cmd out)
+              (check-reg cmd lhs)
+              (check-reg cmd rhs)
+              (unless (eq? (reg-size out) 1)
+                (error "len op expects scalar output" cmd))
+              (let ([lanes (min (reg-size lhs)
+                                (reg-size rhs))])
+                (commit
+                 (reg-set out 0 #`#,(append
+                                     (list #'fl+)
+                                     (for/list ([lane lanes])
+                                       #`(fl* #,(reg-ref lhs lane) #,(reg-ref rhs lane))))))))]
+
            ; Length command handler.
            [handle-len
             (lambda (cmd out vec)
@@ -125,7 +152,7 @@
 
       ; Process accumulated commands to build out 'proc.
       (for ([cmd cmd-seq])
-        (syntax-case cmd (add sub mul div min max len)
+        (syntax-case cmd (add sub mul div min max sqrt dot len)
           ; Addition
           [(add out lhs rhs)
            (let* ([out (syntax->datum #'out)]
@@ -162,6 +189,17 @@
                   [lhs (syntax->datum #'lhs)]
                   [rhs (syntax->datum #'rhs)])
              (handle-op #'flmax cmd out lhs rhs))]
+          ; Square root
+          [(sqrt out vec)
+           (let* ([out (syntax->datum #'out)]
+                  [vec (syntax->datum #'vec)])
+             (handle-sqrt cmd out vec))]
+          ; Dot product
+          [(dot out lhs rhs)
+           (let* ([out (syntax->datum #'out)]
+                  [lhs (syntax->datum #'lhs)]
+                  [rhs (syntax->datum #'rhs)])
+             (handle-dot cmd out lhs rhs))]
           ; Length
           [(len out vec)
            (let* ([out (syntax->datum #'out)]
@@ -188,10 +226,11 @@
   (sdfn (reg 3 input)
         (reg 3 offset 1. 0. 0.)
         (reg 3 point)
-        (reg 1 out -.4)
-        (max point input offset)
-        (len out point)))
+        (reg 1 out)
+        (add point input offset)
+        (dot out point point)
+        (sqrt out out)))
 
 
 ; See if it worked!
-;(display (mysdf 10. 0. 0.))
+(display (mysdf 0. 1. 0.))
