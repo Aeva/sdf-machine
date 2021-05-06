@@ -40,46 +40,47 @@
 
 
 ; Render the distance field, line by line
-(define (scanline bmp field z color)
-  (define width (send bmp get-width))
-  (define height (send bmp get-height))
-  (define ctx (new bitmap-dc% [bitmap bmp]))
-  (define x-extent (/ (- width 1) 2))
-  (define y-extent (/ (- height 1) 2))
-  (send ctx set-pen color 0 'solid)
-  (send ctx set-brush color 'solid)
+(begin-encourage-inline
+  (define (scanline bmp field z color)
+    (define width (send bmp get-width))
+    (define height (send bmp get-height))
+    (define ctx (new bitmap-dc% [bitmap bmp]))
+    (define x-extent (/ (- width 1) 2))
+    (define y-extent (/ (- height 1) 2))
+    (send ctx set-pen color 0 'solid)
+    (send ctx set-brush color 'solid)
 
-  (define scan-start #f)
-  (define scan-stop #f)
+    (define scan-start #f)
+    (define scan-stop #f)
 
-  (begin-encourage-inline
-    (define (draw y)
-      (send ctx draw-line
-            scan-start y
-            scan-stop y)
-      (set! scan-start #f)))
+    (begin-encourage-inline
+      (define (draw y)
+        (send ctx draw-line
+              scan-start y
+              scan-stop y)
+        (set! scan-start #f)))
 
-  (start-atomic)
-  (define start (current-inexact-milliseconds))
-  (for ([y (in-range height)])
-    (for ([x (in-range width)])
-      (define sample-x (- x x-extent))
-      (define sample-y (- y y-extent))
-      (define sample (field (->fl sample-x) (->fl sample-y) z))
-      (define solid (sample . <= . 0))
-      (cond
-        [(and solid scan-start)
-         (set! scan-stop x)]
-        [(and solid (not scan-start))
-         (set! scan-start x)
-         (set! scan-stop x)]
-        [(and (not solid) scan-start)
-         (draw y)]
-        [else (void)]))
-    (when scan-start (draw y)))
-  (define stop (current-inexact-milliseconds))
-  (end-atomic)
-  (- stop start))
+    (start-atomic)
+    (define start (current-inexact-milliseconds))
+    (for ([y (in-range height)])
+      (for ([x (in-range width)])
+        (define sample-x (- x x-extent))
+        (define sample-y (- y y-extent))
+        (define sample (field (->fl sample-x) (->fl sample-y) z))
+        (define solid (sample . <= . 0))
+        (cond
+          [(and solid scan-start)
+           (set! scan-stop x)]
+          [(and solid (not scan-start))
+           (set! scan-start x)
+           (set! scan-stop x)]
+          [(and (not solid) scan-start)
+           (draw y)]
+          [else (void)]))
+      (when scan-start (draw y)))
+    (define stop (current-inexact-milliseconds))
+    (end-atomic)
+    (- stop start)))
 
 
 ; Render the distance field and post some stats.
