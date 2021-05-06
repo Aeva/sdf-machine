@@ -15,9 +15,17 @@
 
 (define sd
   (sdfn (reg 3 input)
-        (reg 4 moop 1. 0. 0. 1.)
-        (reg 1 out -.4)
-        (len out moop)))
+        (reg 3 offset 10. 0. 0.)
+        (reg 3 point)
+        (reg 1 radius 200.)
+        (reg 1 out)
+
+        ; translate
+        (sub point input offset)
+
+        ; sphere
+        (len out point)
+        (sub out out radius)))
 
   
 (define (safe-sd x y z)
