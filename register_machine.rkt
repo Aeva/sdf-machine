@@ -81,8 +81,8 @@
                       (car (hash-ref register-info reg)))]
 
            ; Generates syntax for setting a register.
-           [reg-set (lambda (reg value)
-                      (let ([loc (reg-loc reg)])
+           [reg-set (lambda (reg lane value)
+                      (let ([loc (+ (reg-loc reg) lane)])
                         #`(flvector-set! registers #,loc #,value)))]
 
            ; Generates syntax for reading from a register.
@@ -94,6 +94,21 @@
            [commit (lambda (part)
                      (set! proc (append proc (list part))))]
 
+           ; Generic operator handler.
+           [handle-op
+            (lambda (op cmd out lhs rhs)
+              (check-reg cmd out)
+              (check-reg cmd lhs)
+              (check-reg cmd rhs)
+              (let ([lanes (min (reg-size out)
+                                (reg-size lhs)
+                                (reg-size rhs))])
+                (for ([lane lanes])
+                  (commit
+                   (reg-set out lane #`(#,op
+                                        #,(reg-ref lhs lane)
+                                        #,(reg-ref rhs lane)))))))]
+
            ; Length command handler.
            [handle-len
             (lambda (cmd out vec)
@@ -102,15 +117,52 @@
               (unless (eq? (reg-size out) 1)
                 (error "len op expects scalar output" cmd))
               (commit
-               (reg-set out #`(flsqrt
-                               #,(append
-                                  (list #'fl+)
-                                  (for/list ([i (reg-size vec)])
-                                    #`(fl* #,(reg-ref vec i) #,(reg-ref vec i))))))))])
+               (reg-set out 0 #`(flsqrt
+                                 #,(append
+                                    (list #'fl+)
+                                    (for/list ([i (reg-size vec)])
+                                      #`(fl* #,(reg-ref vec i) #,(reg-ref vec i))))))))])
 
       ; Process accumulated commands to build out 'proc.
       (for ([cmd cmd-seq])
-        (syntax-case cmd (len)
+        (syntax-case cmd (add sub mul div min max len)
+          ; Addition
+          [(add out lhs rhs)
+           (let* ([out (syntax->datum #'out)]
+                  [lhs (syntax->datum #'lhs)]
+                  [rhs (syntax->datum #'rhs)])
+             (handle-op #'fl+ cmd out lhs rhs))]
+          ; Subtraction
+          [(sub out lhs rhs)
+           (let* ([out (syntax->datum #'out)]
+                  [lhs (syntax->datum #'lhs)]
+                  [rhs (syntax->datum #'rhs)])
+             (handle-op #'fl- cmd out lhs rhs))]
+          ; Multiplication
+          [(mul out lhs rhs)
+           (let* ([out (syntax->datum #'out)]
+                  [lhs (syntax->datum #'lhs)]
+                  [rhs (syntax->datum #'rhs)])
+             (handle-op #'fl* cmd out lhs rhs))]
+          ; Division
+          [(div out lhs rhs)
+           (let* ([out (syntax->datum #'out)]
+                  [lhs (syntax->datum #'lhs)]
+                  [rhs (syntax->datum #'rhs)])
+             (handle-op #'fl/ cmd out lhs rhs))]
+          ; Min
+          [(min out lhs rhs)
+           (let* ([out (syntax->datum #'out)]
+                  [lhs (syntax->datum #'lhs)]
+                  [rhs (syntax->datum #'rhs)])
+             (handle-op #'flmin cmd out lhs rhs))]
+          ; Max
+          [(max out lhs rhs)
+           (let* ([out (syntax->datum #'out)]
+                  [lhs (syntax->datum #'lhs)]
+                  [rhs (syntax->datum #'rhs)])
+             (handle-op #'flmax cmd out lhs rhs))]
+          ; Length
           [(len out vec)
            (let* ([out (syntax->datum #'out)]
                   [vec (syntax->datum #'vec)])
@@ -134,10 +186,12 @@
 ; Define a signed distance function!
 (define mysdf
   (sdfn (reg 3 input)
-        (reg 4 moop 1. 0. 0. 1.)
+        (reg 3 offset 1. 0. 0.)
+        (reg 3 point)
         (reg 1 out -.4)
-        (len out moop)))
+        (max point input offset)
+        (len out point)))
 
 
 ; See if it worked!
-;(display (mysdf 1. 1. 0.))
+;(display (mysdf 10. 0. 0.))
