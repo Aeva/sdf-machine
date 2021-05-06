@@ -15,14 +15,21 @@
 
 (define sd
   (sdfn (reg 3 input)
-        (reg 3 offset 10. 0. 0.)
+        (reg 3 offset-1 10. 0. 0.)
+        (reg 3 offset-2 -50. 0. 0.)
         (reg 3 point)
-        (reg 1 radius 200.)
+        (reg 1 radius-1 200.)
+        (reg 1 radius-2 150.)
+        (reg 1 sphere-1)
+        (reg 1 sphere-2)
         (reg 1 out)
-        (sub point input offset) ; translate
-        (sd-sphere out point radius)))
+        (sub point input offset-1)
+        (sd-sphere sphere-1 point radius-1)
+        (sub point input offset-2)
+        (sd-sphere sphere-2 point radius-2)
+        (sd-cut out sphere-1 sphere-2)))
 
-  
+
 (define (safe-sd x y z)
   (unless (flonum? x)
     (error "Expected flonum, got:" x))

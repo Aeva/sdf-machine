@@ -150,6 +150,23 @@
                                     (for/list ([i (reg-size vec)])
                                       #`(fl* #,(reg-ref vec i) #,(reg-ref vec i))))))))]
 
+           ; SD cut operator handler.
+           [handle-sd-cut
+            (lambda (cmd out lhs rhs)
+              (check-reg cmd out)
+              (check-reg cmd lhs)
+              (check-reg cmd rhs)
+              (unless (eq? (reg-size out) 1)
+                (error "sd cut expects a scalar output" cmd))
+              (unless (eq? (reg-size lhs) 1)
+                (error "sd cut expects scalar inputs" cmd))
+              (unless (eq? (reg-size rhs) 1)
+                (error "sd cut expects scalar inputs" cmd))
+              (commit
+               (reg-set out 0 #`(flmax
+                                 #,(reg-ref lhs 0)
+                                 (fl* -1. #,(reg-ref rhs 0))))))]
+
            ; SD Sphere command handler.
            [handle-sd-sphere
             (lambda (cmd out vec rad)
@@ -173,7 +190,7 @@
 
       ; Process accumulated commands to build out 'proc.
       (for ([cmd cmd-seq])
-        (syntax-case cmd (add sub mul div min max sqrt dot len sd-sphere)
+        (syntax-case cmd (add sub mul div min max sqrt dot len sd-cut sd-sphere)
           ; Addition
           [(add out lhs rhs)
            (let* ([out (syntax->datum #'out)]
@@ -226,6 +243,12 @@
            (let* ([out (syntax->datum #'out)]
                   [vec (syntax->datum #'vec)])
              (handle-len cmd out vec))]
+          ; Cut
+          [(sd-cut out lhs rhs)
+           (let* ([out (syntax->datum #'out)]
+                  [lhs (syntax->datum #'lhs)]
+                  [rhs (syntax->datum #'rhs)])
+             (handle-sd-cut cmd out lhs rhs))]
           ; Sphere
           [(sd-sphere out vec rad)
            (let* ([out (syntax->datum #'out)]
