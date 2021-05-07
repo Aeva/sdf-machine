@@ -1,6 +1,7 @@
 #lang racket
 (require racket/format)
 (require racket/flonum)
+(require racket/unsafe/ops)
 
 
 (provide sdfn)
@@ -83,12 +84,12 @@
            ; Generates syntax for setting a register.
            [reg-set (lambda (reg lane value)
                       (let ([loc (+ (reg-loc reg) lane)])
-                        #`(flvector-set! registers #,loc #,value)))]
+                        #`(unsafe-flvector-set! registers #,loc #,value)))]
 
            ; Generates syntax for reading from a register.
            [reg-ref (lambda (reg lane)
                       (let ([loc (+ (reg-loc reg) lane)])
-                        #`(flvector-ref registers #,loc)))]
+                        #`(unsafe-flvector-ref registers #,loc)))]
 
            ; Commit some syntax to the proc list.
            [commit (lambda (part)
@@ -118,7 +119,7 @@
                                 (reg-size vec))])
                 (for ([lane lanes])
                   (commit
-                   (reg-set out lane #`(flsqrt #,(reg-ref vec lane)))))))]
+                   (reg-set out lane #`(unsafe-flsqrt #,(reg-ref vec lane)))))))]
 
            ; Dot product command handler.
            [handle-dot
@@ -132,9 +133,9 @@
                                 (reg-size rhs))])
                 (commit
                  (reg-set out 0 #`#,(append
-                                     (list #'fl+)
+                                     (list #'unsafe-fl+)
                                      (for/list ([lane lanes])
-                                       #`(fl* #,(reg-ref lhs lane) #,(reg-ref rhs lane))))))))]
+                                       #`(unsafe-fl* #,(reg-ref lhs lane) #,(reg-ref rhs lane))))))))]
 
            ; Length command handler.
            [handle-len
@@ -144,11 +145,11 @@
               (unless (eq? (reg-size out) 1)
                 (error "len op expects scalar output" cmd))
               (commit
-               (reg-set out 0 #`(flsqrt
+               (reg-set out 0 #`(unsafe-flsqrt
                                  #,(append
-                                    (list #'fl+)
+                                    (list #'unsafe-fl+)
                                     (for/list ([i (reg-size vec)])
-                                      #`(fl* #,(reg-ref vec i) #,(reg-ref vec i))))))))]
+                                      #`(unsafe-fl* #,(reg-ref vec i) #,(reg-ref vec i))))))))]
 
            ; SD cut operator handler.
            [handle-sd-cut
@@ -163,9 +164,9 @@
               (unless (eq? (reg-size rhs) 1)
                 (error "sd cut expects scalar inputs" cmd))
               (commit
-               (reg-set out 0 #`(flmax
+               (reg-set out 0 #`(unsafe-flmax
                                  #,(reg-ref lhs 0)
-                                 (fl* -1. #,(reg-ref rhs 0))))))]
+                                 (unsafe-fl* -1. #,(reg-ref rhs 0))))))]
 
            ; SD Sphere command handler.
            [handle-sd-sphere
@@ -180,12 +181,12 @@
               (unless (eq? (reg-size rad) 1)
                 (error "sd sphere expects a scalar radius" cmd))
               (commit
-               (reg-set out 0 #`(fl-
-                                 (flsqrt
+               (reg-set out 0 #`(unsafe-fl-
+                                 (unsafe-flsqrt
                                   #,(append
-                                     (list #'fl+)
+                                     (list #'unsafe-fl+)
                                      (for/list ([i (reg-size vec)])
-                                       #`(fl* #,(reg-ref vec i) #,(reg-ref vec i)))))
+                                       #`(unsafe-fl* #,(reg-ref vec i) #,(reg-ref vec i)))))
                                  #,(reg-ref rad 0)))))])
 
       ; Process accumulated commands to build out 'proc.
@@ -196,37 +197,37 @@
            (let* ([out (syntax->datum #'out)]
                   [lhs (syntax->datum #'lhs)]
                   [rhs (syntax->datum #'rhs)])
-             (handle-op #'fl+ cmd out lhs rhs))]
+             (handle-op #'unsafe-fl+ cmd out lhs rhs))]
           ; Subtraction
           [(sub out lhs rhs)
            (let* ([out (syntax->datum #'out)]
                   [lhs (syntax->datum #'lhs)]
                   [rhs (syntax->datum #'rhs)])
-             (handle-op #'fl- cmd out lhs rhs))]
+             (handle-op #'unsafe-fl- cmd out lhs rhs))]
           ; Multiplication
           [(mul out lhs rhs)
            (let* ([out (syntax->datum #'out)]
                   [lhs (syntax->datum #'lhs)]
                   [rhs (syntax->datum #'rhs)])
-             (handle-op #'fl* cmd out lhs rhs))]
+             (handle-op #'unsafe-fl* cmd out lhs rhs))]
           ; Division
           [(div out lhs rhs)
            (let* ([out (syntax->datum #'out)]
                   [lhs (syntax->datum #'lhs)]
                   [rhs (syntax->datum #'rhs)])
-             (handle-op #'fl/ cmd out lhs rhs))]
+             (handle-op #'unsafe-fl/ cmd out lhs rhs))]
           ; Min
           [(min out lhs rhs)
            (let* ([out (syntax->datum #'out)]
                   [lhs (syntax->datum #'lhs)]
                   [rhs (syntax->datum #'rhs)])
-             (handle-op #'flmin cmd out lhs rhs))]
+             (handle-op #'unsafe-flmin cmd out lhs rhs))]
           ; Max
           [(max out lhs rhs)
            (let* ([out (syntax->datum #'out)]
                   [lhs (syntax->datum #'lhs)]
                   [rhs (syntax->datum #'rhs)])
-             (handle-op #'flmax cmd out lhs rhs))]
+             (handle-op #'unsafe-flmax cmd out lhs rhs))]
           ; Square root
           [(sqrt out vec)
            (let* ([out (syntax->datum #'out)]
@@ -264,8 +265,8 @@
           ([registers
             (apply flvector '#,initial-values)])
         (lambda (x y z)
-          (flvector-set! registers 0 x)
-          (flvector-set! registers 1 y)
-          (flvector-set! registers 2 z)
+          (unsafe-flvector-set! registers 0 x)
+          (unsafe-flvector-set! registers 1 y)
+          (unsafe-flvector-set! registers 2 z)
           #,(datum->syntax stx proc)
-          (flvector-ref registers #,(- cursor 1))))))
+          (unsafe-flvector-ref registers #,(- cursor 1))))))
